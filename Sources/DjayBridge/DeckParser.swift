@@ -117,6 +117,10 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
         else if lower.starts(with: "play /") { info.isPlaying = (valueString == "Active") }
         else if lowerProp.starts(with: "key lock") { info.keyLockEnabled = (valueString == "Active") }
         else if lowerProp.starts(with: "quantize") { info.quantizeEnabled = (valueString == "Active") }
+        else if lowerProp == "instrumental" { info.neuralInstrumentalEnabled = (valueString == "Active") }
+        else if lowerProp == "percussive" { info.neuralPercussiveEnabled = (valueString == "Active") }
+        else if lowerProp == "acapella" { info.neuralAcapellaEnabled = (valueString == "Active") }
+        else if lowerProp == "tonal" { info.neuralTonalEnabled = (valueString == "Active") }
         else if lowerProp == "loop" {
             let trimmed = valueString.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed == "Active" {

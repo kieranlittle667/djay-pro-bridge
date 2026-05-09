@@ -231,7 +231,10 @@ final class DeckAnnouncer {
 
         announceTrackChange(deckNumber: deckNumber, previous: previous, current: deck)
         announcePlayState(deckNumber: deckNumber, previous: previous, current: deck)
+        announceQuantizeChange(deckNumber: deckNumber, previous: previous, current: deck)
+        announceKeyLockChange(deckNumber: deckNumber, previous: previous, current: deck)
         announceLoopChange(deckNumber: deckNumber, previous: previous, current: deck)
+        announceNeuralMixChanges(deckNumber: deckNumber, previous: previous, current: deck)
         announceFXChanges(deckNumber: deckNumber, previous: previous, current: deck)
     }
 
@@ -264,6 +267,33 @@ final class DeckAnnouncer {
         guard previous.isPlaying != current.isPlaying else { return }
         let state = current.isPlaying ? "playing" : "paused"
         speaker.speak("Deck \(deckNumber) \(state)", key: "deck\(deckNumber)-play", minInterval: 0.4)
+    }
+
+
+    private func announceQuantizeChange(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
+        guard let currentValue = current.quantizeEnabled,
+              let previousValue = previous.quantizeEnabled,
+              currentValue != previousValue else { return }
+        speaker.speak(
+            "Deck \(deckNumber) quantize \(currentValue ? "on" : "off")",
+            key: "deck\(deckNumber)-quantize",
+            minInterval: 0.15,
+            coalesce: true,
+            settleDelay: 0.08
+        )
+    }
+
+    private func announceKeyLockChange(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
+        guard let currentValue = current.keyLockEnabled,
+              let previousValue = previous.keyLockEnabled,
+              currentValue != previousValue else { return }
+        speaker.speak(
+            "Deck \(deckNumber) key lock \(currentValue ? "on" : "off")",
+            key: "deck\(deckNumber)-keylock",
+            minInterval: 0.15,
+            coalesce: true,
+            settleDelay: 0.08
+        )
     }
 
     private func announceLoopChange(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
@@ -332,6 +362,24 @@ final class DeckAnnouncer {
         )
     }
 
+    private func announceNeuralMixChanges(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
+        announceNeuralToggle(deckNumber: deckNumber, name: "instrumental", previous: previous.neuralInstrumentalEnabled, current: current.neuralInstrumentalEnabled)
+        announceNeuralToggle(deckNumber: deckNumber, name: "percussive", previous: previous.neuralPercussiveEnabled, current: current.neuralPercussiveEnabled)
+        announceNeuralToggle(deckNumber: deckNumber, name: "acapella", previous: previous.neuralAcapellaEnabled, current: current.neuralAcapellaEnabled)
+        announceNeuralToggle(deckNumber: deckNumber, name: "tonal", previous: previous.neuralTonalEnabled, current: current.neuralTonalEnabled)
+    }
+
+    private func announceNeuralToggle(deckNumber: Int, name: String, previous: Bool?, current: Bool?) {
+        guard let current, let previous, current != previous else { return }
+        speaker.speak(
+            "Deck \(deckNumber) \(name) \(current ? "on" : "off")",
+            key: "deck\(deckNumber)-neural-\(name)",
+            minInterval: 0.15,
+            coalesce: true,
+            settleDelay: 0.08
+        )
+    }
+
     private func announceFXChanges(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
         let slots = Set(previous.fxSlots.keys).union(current.fxSlots.keys)
         for slot in slots.sorted() {
@@ -360,5 +408,61 @@ final class DeckAnnouncer {
                 )
             }
         }
+    }
+}
+
+
+final class GlobalAnnouncer {
+    private let speaker: SpeechCoordinator
+    private var lastCrossfaderZone: String?
+    private var lastMainDeck: Int?
+    private var seeded = false
+
+    init(speaker: SpeechCoordinator) {
+        self.speaker = speaker
+    }
+
+    func process(crossfader: String?, mainDeck: Int?) {
+        let zone = crossfaderZone(from: crossfader)
+
+        guard seeded else {
+            lastCrossfaderZone = zone
+            lastMainDeck = mainDeck
+            seeded = true
+            return
+        }
+
+        if zone != lastCrossfaderZone, let zone {
+            speaker.speak(
+                zone == "left" ? "Crossfader left" : zone == "right" ? "Crossfader right" : "Crossfader center",
+                key: "crossfader-zone",
+                minInterval: 0.12,
+                coalesce: true,
+                settleDelay: 0.06
+            )
+            lastCrossfaderZone = zone
+        }
+
+        if mainDeck != lastMainDeck {
+            if let mainDeck {
+                speaker.speak(
+                    "Main deck \(mainDeck)",
+                    key: "main-deck",
+                    minInterval: 0.2,
+                    coalesce: true,
+                    settleDelay: 0.08
+                )
+            }
+            lastMainDeck = mainDeck
+        }
+    }
+
+    private func crossfaderZone(from value: String?) -> String? {
+        guard let value else { return nil }
+        let cleaned = value.replacingOccurrences(of: "%", with: "")
+        guard let percent = Int(cleaned) else { return nil }
+        if percent <= 20 { return "left" }
+        if percent >= 80 { return "right" }
+        return "center"
     }
 }

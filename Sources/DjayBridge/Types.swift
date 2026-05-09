@@ -33,6 +33,10 @@ public struct DeckInfo: Equatable {
     public var quantizeEnabled: Bool?
     public var loopEnabled: Bool?
     public var loopSize: String?
+    public var neuralInstrumentalEnabled: Bool?
+    public var neuralPercussiveEnabled: Bool?
+    public var neuralAcapellaEnabled: Bool?
+    public var neuralTonalEnabled: Bool?
     public var filter: String?
     public var gain: String?
     public var eqHigh: String?
@@ -54,6 +58,10 @@ public struct DeckInfo: Equatable {
         quantizeEnabled: Bool? = nil,
         loopEnabled: Bool? = nil,
         loopSize: String? = nil,
+        neuralInstrumentalEnabled: Bool? = nil,
+        neuralPercussiveEnabled: Bool? = nil,
+        neuralAcapellaEnabled: Bool? = nil,
+        neuralTonalEnabled: Bool? = nil,
         filter: String? = nil,
         gain: String? = nil,
         eqHigh: String? = nil,
@@ -74,6 +82,10 @@ public struct DeckInfo: Equatable {
         self.quantizeEnabled = quantizeEnabled
         self.loopEnabled = loopEnabled
         self.loopSize = loopSize
+        self.neuralInstrumentalEnabled = neuralInstrumentalEnabled
+        self.neuralPercussiveEnabled = neuralPercussiveEnabled
+        self.neuralAcapellaEnabled = neuralAcapellaEnabled
+        self.neuralTonalEnabled = neuralTonalEnabled
         self.filter = filter
         self.gain = gain
         self.eqHigh = eqHigh

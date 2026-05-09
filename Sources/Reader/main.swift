@@ -101,7 +101,9 @@ class SharedState {
 }
 
 let state = SharedState()
-let announcer = speakMode ? DeckAnnouncer(speaker: SpeechCoordinator(preferredVoiceName: preferredVoiceName, backend: speechBackend)) : nil
+let speaker = speakMode ? SpeechCoordinator(preferredVoiceName: preferredVoiceName, backend: speechBackend) : nil
+let announcer = speaker.map { DeckAnnouncer(speaker: $0) }
+let globalAnnouncer = speaker.map { GlobalAnnouncer(speaker: $0) }
 
 // MARK: - AX polling thread
 
@@ -118,6 +120,10 @@ pollQueue.async {
         if let announcer {
             announcer.process(deckNumber: 1, deck: debouncedDeck1)
             announcer.process(deckNumber: 2, deck: debouncedDeck2)
+        }
+        if let globalAnnouncer {
+            let (_, _, _, _, _, _, debouncedCrossfader, debouncedMainDeck) = state.snapshot()
+            globalAnnouncer.process(crossfader: debouncedCrossfader, mainDeck: debouncedMainDeck)
         }
         // No sleep — poll as fast as AX allows (~8fps)
     }
