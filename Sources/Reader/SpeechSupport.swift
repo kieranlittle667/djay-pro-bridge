@@ -3,6 +3,13 @@ import AVFoundation
 import AppKit
 import Foundation
 
+enum SpeechBackend {
+    case auto
+    case say
+    case voiceOver
+    case avSpeech
+}
+
 final class SpeechCoordinator: NSObject {
     private let synthesizer = AVSpeechSynthesizer()
     private let preferredVoiceName: String?
@@ -10,18 +17,18 @@ final class SpeechCoordinator: NSObject {
     private let queue = DispatchQueue(label: "speech-coordinator")
     private var lastSpokenAtByKey: [String: Date] = [:]
     private let logAnnouncements: Bool
-    private let preferSayFallback: Bool
+    private let backend: SpeechBackend
 
     init(
         preferredVoiceName: String? = nil,
         rate: Float = 0.42,
         logAnnouncements: Bool = true,
-        preferSayFallback: Bool = true
+        backend: SpeechBackend = .say
     ) {
         self.preferredVoiceName = preferredVoiceName
         self.rate = rate
         self.logAnnouncements = logAnnouncements
-        self.preferSayFallback = preferSayFallback
+        self.backend = backend
         super.init()
     }
 
@@ -38,15 +45,24 @@ final class SpeechCoordinator: NSObject {
                 fflush(stdout)
             }
 
-            if self.isVoiceOverRunning(), self.postVoiceOverAnnouncement(text) {
-                return
+            switch self.backend {
+            case .say:
+                _ = self.speakWithSay(text)
+            case .voiceOver:
+                if !self.postVoiceOverAnnouncement(text) {
+                    _ = self.speakWithSay(text)
+                }
+            case .avSpeech:
+                self.speakWithSystemVoice(text)
+            case .auto:
+                if self.isVoiceOverRunning(), self.postVoiceOverAnnouncement(text) {
+                    return
+                }
+                if self.speakWithSay(text) {
+                    return
+                }
+                self.speakWithSystemVoice(text)
             }
-
-            if self.preferSayFallback, self.speakWithSay(text) {
-                return
-            }
-
-            self.speakWithSystemVoice(text)
         }
     }
 

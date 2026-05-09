@@ -7,6 +7,7 @@ var logMode = false
 var speakMode = false
 var renderIntervalMs: UInt32 = 33  // ~30fps default
 var preferredVoiceName: String? = nil
+var speechBackend = SpeechBackend.say
 
 let args = CommandLine.arguments
 if let idx = args.firstIndex(of: "--interval"), idx + 1 < args.count,
@@ -22,6 +23,15 @@ if args.contains("--speak") {
 if let idx = args.firstIndex(of: "--voice"), idx + 1 < args.count {
     preferredVoiceName = args[idx + 1]
 }
+if let idx = args.firstIndex(of: "--speech-backend"), idx + 1 < args.count {
+    switch args[idx + 1].lowercased() {
+    case "auto": speechBackend = .auto
+    case "say": speechBackend = .say
+    case "voiceover", "vo": speechBackend = .voiceOver
+    case "avspeech", "av": speechBackend = .avSpeech
+    default: break
+    }
+}
 
 // MARK: - Find djay Pro and check permissions
 
@@ -29,8 +39,8 @@ guard let djay = findDjayPro() else { exit(1) }
 guard checkAccessibilityPermission(djay.element) else { exit(1) }
 
 if speakMode {
-    let voiceText = preferredVoiceName.map { " using voice \($0) when VoiceOver is not running" } ?? ""
-    printError("🔊 Speech announcements enabled\(voiceText)")
+    let voiceText = preferredVoiceName.map { " using voice \($0)" } ?? ""
+    printError("🔊 Speech announcements enabled via \(speechBackend)\(voiceText)")
 }
 printError("🎧 Rendering at ~\(1000 / max(renderIntervalMs, 1))fps, polling AX in background... (Ctrl+C to stop)\n")
 
@@ -85,7 +95,7 @@ class SharedState {
 }
 
 let state = SharedState()
-let announcer = speakMode ? DeckAnnouncer(speaker: SpeechCoordinator(preferredVoiceName: preferredVoiceName)) : nil
+let announcer = speakMode ? DeckAnnouncer(speaker: SpeechCoordinator(preferredVoiceName: preferredVoiceName, backend: speechBackend)) : nil
 
 // MARK: - AX polling thread
 
