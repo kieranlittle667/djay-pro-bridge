@@ -46,6 +46,7 @@ final class SpeechCoordinator: NSObject {
     ) {
         if coalesce || settleDelay > 0 {
             schedulerQueue.async {
+                if self.pendingWorkByKey[key] != nil { Logger.shared.log("COALESCE replace key=\(key) text=\(text)") }
                 self.pendingWorkByKey[key]?.cancel()
                 let work = DispatchWorkItem { [weak self] in
                     self?.enqueueSpeech(text, key: key, minInterval: minInterval)
@@ -62,6 +63,7 @@ final class SpeechCoordinator: NSObject {
         speechQueue.async {
             let now = Date()
             if let last = self.lastSpokenAtByKey[key], now.timeIntervalSince(last) < minInterval {
+                Logger.shared.log("DROP rate_limit key=\(key) text=\(text)")
                 return
             }
             self.lastSpokenAtByKey[key] = now
@@ -69,6 +71,7 @@ final class SpeechCoordinator: NSObject {
             if self.logAnnouncements {
                 print("ANNOUNCE: \(text)")
                 fflush(stdout)
+                Logger.shared.log("ANNOUNCE key=\(key) text=\(text)")
             }
 
             switch self.backend {

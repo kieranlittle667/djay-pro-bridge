@@ -8,6 +8,7 @@ var speakMode = false
 var renderIntervalMs: UInt32 = 33  // ~30fps default
 var preferredVoiceName: String? = nil
 var speechBackend = SpeechBackend.auto
+var logFilePath: String? = nil
 
 let args = CommandLine.arguments
 if let idx = args.firstIndex(of: "--interval"), idx + 1 < args.count,
@@ -32,6 +33,11 @@ if let idx = args.firstIndex(of: "--speech-backend"), idx + 1 < args.count {
     default: break
     }
 }
+if let idx = args.firstIndex(of: "--log-file"), idx + 1 < args.count {
+    logFilePath = args[idx + 1]
+}
+
+Logger.shared.configure(path: logFilePath)
 
 // MARK: - Find djay Pro and check permissions
 
@@ -106,6 +112,7 @@ pollQueue.async {
         let deck2 = getDeckInfo(app: djay.element, deckNumber: 2)
         let crossfader = getCrossfader(app: djay.element)
         state.updateFromAX(deck1: deck1, deck2: deck2, crossfader: crossfader)
+        Logger.shared.log("STATE d1_title=\(deck1.title ?? "-") d1_loop=\(deck1.loopSize ?? "-") d1_play=\(deck1.isPlaying) d2_title=\(deck2.title ?? "-") d2_loop=\(deck2.loopSize ?? "-") d2_play=\(deck2.isPlaying) cf=\(crossfader ?? "-")")
 
         if let announcer {
             announcer.process(deckNumber: 1, deck: deck1)
