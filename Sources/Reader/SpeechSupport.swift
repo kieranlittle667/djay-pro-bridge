@@ -52,13 +52,13 @@ final class SpeechCoordinator: NSObject {
             case .say:
                 _ = self.speakWithSay(text)
             case .voiceOver:
-                if !self.postVoiceOverAnnouncement(text) {
+                if !self.speakWithVoiceOver(text) {
                     _ = self.speakWithSay(text)
                 }
             case .avSpeech:
                 self.speakWithSystemVoice(text)
             case .auto:
-                if self.isVoiceOverRunning(), self.postVoiceOverAnnouncement(text) {
+                if self.isVoiceOverRunning(), self.speakWithVoiceOver(text) {
                     return
                 }
                 if self.speakWithSay(text) {
@@ -70,8 +70,14 @@ final class SpeechCoordinator: NSObject {
     }
 
     private func estimatedDuration(for text: String) -> TimeInterval {
-        let words = max(1, text.split(whereSeparator: \ .isWhitespace).count)
+        let words = max(1, text.split(whereSeparator: { $0.isWhitespace }).count)
         return max(0.6, Double(words) * 0.33 + minimumGap)
+    }
+
+    private func escapeAppleScript(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
     private func isVoiceOverRunning() -> Bool {
@@ -82,18 +88,22 @@ final class SpeechCoordinator: NSObject {
     }
 
     @discardableResult
-    private func postVoiceOverAnnouncement(_ text: String) -> Bool {
-        let userInfo: [NSAccessibility.NotificationUserInfoKey: Any] = [
-            .announcement: text,
-            .priority: NSAccessibilityPriorityLevel.high.rawValue,
+    private func speakWithVoiceOver(_ text: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = [
+            "-e",
+            "tell application \"VoiceOver\" to output \"\(escapeAppleScript(text))\"",
         ]
-        NSAccessibility.post(
-            element: self,
-            notification: .announcementRequested,
-            userInfo: userInfo
-        )
-        Thread.sleep(forTimeInterval: estimatedDuration(for: text))
-        return true
+        do {
+            try process.run()
+            process.waitUntilExit()
+            Thread.sleep(forTimeInterval: estimatedDuration(for: text))
+            return process.terminationStatus == 0
+        } catch {
+            printError("⚠️ Failed to send VoiceOver output: \(error)")
+            return false
+        }
     }
 
     @discardableResult
