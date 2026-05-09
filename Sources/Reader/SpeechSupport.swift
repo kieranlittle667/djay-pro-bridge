@@ -9,10 +9,19 @@ final class SpeechCoordinator: NSObject {
     private let rate: Float
     private let queue = DispatchQueue(label: "speech-coordinator")
     private var lastSpokenAtByKey: [String: Date] = [:]
+    private let logAnnouncements: Bool
+    private let preferSayFallback: Bool
 
-    init(preferredVoiceName: String? = nil, rate: Float = 0.42) {
+    init(
+        preferredVoiceName: String? = nil,
+        rate: Float = 0.42,
+        logAnnouncements: Bool = true,
+        preferSayFallback: Bool = true
+    ) {
         self.preferredVoiceName = preferredVoiceName
         self.rate = rate
+        self.logAnnouncements = logAnnouncements
+        self.preferSayFallback = preferSayFallback
         super.init()
     }
 
@@ -24,11 +33,20 @@ final class SpeechCoordinator: NSObject {
             }
             self.lastSpokenAtByKey[key] = now
 
-            if self.isVoiceOverRunning() {
-                self.postVoiceOverAnnouncement(text)
-            } else {
-                self.speakWithSystemVoice(text)
+            if self.logAnnouncements {
+                print("ANNOUNCE: \(text)")
+                fflush(stdout)
             }
+
+            if self.isVoiceOverRunning(), self.postVoiceOverAnnouncement(text) {
+                return
+            }
+
+            if self.preferSayFallback, self.speakWithSay(text) {
+                return
+            }
+
+            self.speakWithSystemVoice(text)
         }
     }
 
@@ -39,7 +57,8 @@ final class SpeechCoordinator: NSObject {
         }
     }
 
-    private func postVoiceOverAnnouncement(_ text: String) {
+    @discardableResult
+    private func postVoiceOverAnnouncement(_ text: String) -> Bool {
         let userInfo: [NSAccessibility.NotificationUserInfoKey: Any] = [
             .announcement: text,
             .priority: NSAccessibilityPriorityLevel.high.rawValue,
@@ -49,6 +68,26 @@ final class SpeechCoordinator: NSObject {
             notification: .announcementRequested,
             userInfo: userInfo
         )
+        return true
+    }
+
+    @discardableResult
+    private func speakWithSay(_ text: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+        var arguments: [String] = []
+        if let preferredVoiceName, !preferredVoiceName.isEmpty {
+            arguments += ["-v", preferredVoiceName]
+        }
+        arguments.append(text)
+        process.arguments = arguments
+        do {
+            try process.run()
+            return true
+        } catch {
+            printError("⚠️ Failed to run say: \(error)")
+            return false
+        }
     }
 
     private func speakWithSystemVoice(_ text: String) {

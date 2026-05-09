@@ -84,6 +84,7 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
         let lower = label.lowercased()
         let prop = labelPrefix(label)
         let lowerProp = prop.lowercased()
+        let isFXLabel = lower.contains(", fx ")
 
         if lower.starts(with: "key,") { info.key = value }
         else if lower.starts(with: "title,") { info.title = value }
@@ -108,16 +109,16 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
         else if lowerProp == "high" || lowerProp == "high eq" { info.eqHigh = value }
         else if lowerProp == "mid" || lowerProp == "mid eq" { info.eqMid = value }
         else if lowerProp == "low" || lowerProp == "low eq" { info.eqLow = value }
-        else if lowerProp.contains("fx") {
-            let slot = parseSlotNumber(from: lowerProp) ?? 1
-            if lowerProp.contains("parameter name") {
-                setFXSlotValue(&info, slot: slot) { $0.parameterName = value }
-            } else if lowerProp.contains("wet/dry") || lowerProp.contains("wet dry") {
-                setFXSlotValue(&info, slot: slot) { $0.wetDry = value }
-            } else if lowerProp.contains("enable") {
+        else if isFXLabel {
+            let slot = parseSlotNumber(from: lower) ?? parseSlotNumber(from: lowerProp) ?? 1
+            if lowerProp == "enabled" {
                 setFXSlotValue(&info, slot: slot) { $0.isEnabled = (value == "Active") }
-            } else if lowerProp.contains("parameter") {
+            } else if lowerProp == "parameter" {
                 setFXSlotValue(&info, slot: slot) { $0.parameterValue = value }
+            } else if lowerProp == "wet/dry" || lowerProp == "wet dry" {
+                setFXSlotValue(&info, slot: slot) { $0.wetDry = value }
+            } else if lowerProp != "previous" && lowerProp != "next" && !lowerProp.contains("minus") && !lowerProp.contains("plus") {
+                setFXSlotValue(&info, slot: slot) { $0.parameterName = prop }
             }
         }
     }
