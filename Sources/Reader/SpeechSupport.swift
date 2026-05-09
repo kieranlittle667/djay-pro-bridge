@@ -14,9 +14,10 @@ final class SpeechCoordinator: NSObject {
     private let synthesizer = AVSpeechSynthesizer()
     private let preferredVoiceName: String?
     private let rate: Float
-    private let queue = DispatchQueue(label: "speech-coordinator")
+    private let speechQueue = DispatchQueue(label: "speech-coordinator")
+    private let schedulerQueue = DispatchQueue(label: "speech-scheduler")
     private var lastSpokenAtByKey: [String: Date] = [:]
-    private var latestRequestByKey: [String: UUID] = [:]
+    private var pendingWorkByKey: [String: DispatchWorkItem] = [:]
     private let logAnnouncements: Bool
     private let backend: SpeechBackend
     private let minimumGap: TimeInterval
@@ -36,18 +37,31 @@ final class SpeechCoordinator: NSObject {
         super.init()
     }
 
-    func speak(_ text: String, key: String, minInterval: TimeInterval = 0.75, coalesce: Bool = false) {
-        let requestId = UUID()
-        queue.async {
-            if coalesce {
-                self.latestRequestByKey[key] = requestId
+    func speak(
+        _ text: String,
+        key: String,
+        minInterval: TimeInterval = 0.75,
+        coalesce: Bool = false,
+        settleDelay: TimeInterval = 0
+    ) {
+        if coalesce || settleDelay > 0 {
+            schedulerQueue.async {
+                self.pendingWorkByKey[key]?.cancel()
+                let work = DispatchWorkItem { [weak self] in
+                    self?.enqueueSpeech(text, key: key, minInterval: minInterval)
+                }
+                self.pendingWorkByKey[key] = work
+                self.schedulerQueue.asyncAfter(deadline: .now() + max(settleDelay, minInterval), execute: work)
             }
+        } else {
+            enqueueSpeech(text, key: key, minInterval: minInterval)
+        }
+    }
 
+    private func enqueueSpeech(_ text: String, key: String, minInterval: TimeInterval) {
+        speechQueue.async {
             let now = Date()
             if let last = self.lastSpokenAtByKey[key], now.timeIntervalSince(last) < minInterval {
-                return
-            }
-            if coalesce, self.latestRequestByKey[key] != requestId {
                 return
             }
             self.lastSpokenAtByKey[key] = now
@@ -215,7 +229,13 @@ final class DeckAnnouncer {
         guard let loop = current.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !loop.isEmpty,
               let previousLoop = previous.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !previousLoop.isEmpty,
               loop != previousLoop else { return }
-        speaker.speak("Deck \(deckNumber) loop \(loop)", key: "deck\(deckNumber)-loop", minInterval: 0.2, coalesce: true)
+        speaker.speak(
+            "Deck \(deckNumber) loop \(loop)",
+            key: "deck\(deckNumber)-loop",
+            minInterval: 0.1,
+            coalesce: true,
+            settleDelay: 0.45
+        )
     }
 
     private func announceFXChanges(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
@@ -227,15 +247,22 @@ final class DeckAnnouncer {
             if let name = new.parameterName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
                let oldName = old.parameterName?.trimmingCharacters(in: .whitespacesAndNewlines), !oldName.isEmpty,
                name != oldName {
-                speaker.speak("Deck \(deckNumber) FX \(slot) \(name)", key: "deck\(deckNumber)-fx\(slot)-name", minInterval: 0.2, coalesce: true)
+                speaker.speak(
+                    "Deck \(deckNumber) FX \(slot) \(name)",
+                    key: "deck\(deckNumber)-fx\(slot)-name",
+                    minInterval: 0.1,
+                    coalesce: true,
+                    settleDelay: 0.25
+                )
             }
 
             if let enabled = new.isEnabled, let oldEnabled = old.isEnabled, enabled != oldEnabled {
                 speaker.speak(
                     "Deck \(deckNumber) FX \(slot) \(enabled ? "on" : "off")",
                     key: "deck\(deckNumber)-fx\(slot)-enabled",
-                    minInterval: 0.15,
-                    coalesce: true
+                    minInterval: 0.1,
+                    coalesce: true,
+                    settleDelay: 0.12
                 )
             }
         }
