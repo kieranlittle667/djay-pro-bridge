@@ -28,7 +28,7 @@ final class SpeechCoordinator: NSObject {
         rate: Float = 0.42,
         logAnnouncements: Bool = true,
         backend: SpeechBackend = .auto,
-        minimumGap: TimeInterval = 0.15
+        minimumGap: TimeInterval = 0.08
     ) {
         self.preferredVoiceName = preferredVoiceName
         self.rate = rate
@@ -127,6 +127,11 @@ final class SpeechCoordinator: NSObject {
         return max(0.45, Double(words) * 0.22 + minimumGap)
     }
 
+    private func voiceOverCooldown(for text: String) -> TimeInterval {
+        let words = max(1, text.split(whereSeparator: { $0.isWhitespace }).count)
+        return min(0.18, max(0.05, Double(words) * 0.025))
+    }
+
     private func escapeAppleScript(_ text: String) -> String {
         text
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -151,7 +156,7 @@ final class SpeechCoordinator: NSObject {
         do {
             try process.run()
             process.waitUntilExit()
-            Thread.sleep(forTimeInterval: estimatedDuration(for: text))
+            Thread.sleep(forTimeInterval: voiceOverCooldown(for: text))
             return process.terminationStatus == 0
         } catch {
             printError("⚠️ Failed to send VoiceOver output: \(error)")
@@ -185,7 +190,7 @@ final class SpeechCoordinator: NSObject {
         utterance.rate = rate
         utterance.voice = resolveVoice()
         synthesizer.speak(utterance)
-        Thread.sleep(forTimeInterval: estimatedDuration(for: text))
+        Thread.sleep(forTimeInterval: voiceOverCooldown(for: text))
     }
 
     private func resolveVoice() -> AVSpeechSynthesisVoice? {
