@@ -226,13 +226,14 @@ final class DeckAnnouncer {
     }
 
     private func isMeaningful(_ deck: DeckInfo) -> Bool {
-        deck.title?.isEmpty == false || deck.artist?.isEmpty == false || deck.bpm?.isEmpty == false || !deck.fxSlots.isEmpty || deck.loopSize?.isEmpty == false
+        deck.title?.isEmpty == false || deck.artist?.isEmpty == false || deck.bpm?.isEmpty == false || !deck.fxSlots.isEmpty || deck.loopSize?.isEmpty == false || deck.loopEnabled != nil
     }
 
     private func looksLikeBulkRefresh(previous: DeckInfo, current: DeckInfo) -> Bool {
         var changes = 0
         if previous.title != current.title { changes += 1 }
         if previous.artist != current.artist { changes += 1 }
+        if previous.loopEnabled != current.loopEnabled { changes += 1 }
         if previous.loopSize != current.loopSize { changes += 1 }
         if previous.isPlaying != current.isPlaying { changes += 1 }
         if previous.fxSlots != current.fxSlots { changes += 1 }
@@ -256,15 +257,43 @@ final class DeckAnnouncer {
     }
 
     private func announceLoopChange(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
-        guard let loop = current.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !loop.isEmpty,
-              let previousLoop = previous.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !previousLoop.isEmpty,
-              loop != previousLoop else { return }
+        let previousEnabled = previous.loopEnabled ?? false
+        let currentEnabled = current.loopEnabled ?? false
+        let previousLoop = previous.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentLoop = current.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if previousEnabled != currentEnabled {
+            let text: String
+            if currentEnabled {
+                if let currentLoop, !currentLoop.isEmpty {
+                    text = "Deck \(deckNumber) loop \(currentLoop)"
+                } else {
+                    text = "Deck \(deckNumber) loop on"
+                }
+            } else {
+                text = "Deck \(deckNumber) loop off"
+            }
+            speaker.speak(
+                text,
+                key: "deck\(deckNumber)-loop-enabled",
+                minInterval: 0.05,
+                coalesce: true,
+                settleDelay: 0.2
+            )
+            return
+        }
+
+        guard currentEnabled,
+              let currentLoop, !currentLoop.isEmpty,
+              let previousLoop, !previousLoop.isEmpty,
+              currentLoop != previousLoop else { return }
+
         speaker.speak(
-            "Deck \(deckNumber) loop \(loop)",
-            key: "deck\(deckNumber)-loop",
+            "Deck \(deckNumber) loop \(currentLoop)",
+            key: "deck\(deckNumber)-loop-size",
             minInterval: 0.05,
             coalesce: true,
-            settleDelay: 0.35
+            settleDelay: 0.3
         )
     }
 

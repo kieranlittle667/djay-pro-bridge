@@ -84,6 +84,13 @@ private func fxParts(from prop: String) -> (name: String, slot: Int)? {
     return (name, slot)
 }
 
+private func looksLikeLoopLength(_ value: String) -> Bool {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return false }
+    let lower = trimmed.lowercased()
+    return lower.contains("beat") || lower.contains("bar") || lower.contains("loop") || lower.range(of: #"^\d+(/\d+)?$"#, options: .regularExpression) != nil
+}
+
 private func setFXSlotValue(_ info: inout DeckInfo, slot: Int, update: (inout FXSlotInfo) -> Void) {
     var fxSlot = info.fxSlots[slot] ?? FXSlotInfo()
     update(&fxSlot)
@@ -110,7 +117,16 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
         else if lower.starts(with: "play /") { info.isPlaying = (valueString == "Active") }
         else if lowerProp.starts(with: "key lock") { info.keyLockEnabled = (valueString == "Active") }
         else if lowerProp.starts(with: "quantize") { info.quantizeEnabled = (valueString == "Active") }
-        else if lowerProp == "loop" { info.loopSize = valueString }
+        else if lowerProp == "loop" {
+            let trimmed = valueString.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed == "Active" {
+                info.loopEnabled = true
+            } else if trimmed.isEmpty {
+                if info.loopEnabled == nil { info.loopEnabled = false }
+            } else if looksLikeLoopLength(trimmed) {
+                info.loopSize = trimmed
+            }
+        }
         // Value-as-label: BPM is a numeric label like "124.0, Deck 1"
         else if prop.range(of: #"^\d+\.\d+$"#, options: .regularExpression) != nil {
             info.bpm = prop

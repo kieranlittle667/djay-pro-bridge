@@ -31,6 +31,7 @@ public struct DeckInfo: Equatable {
     public var lineVolume: String?
     public var keyLockEnabled: Bool?
     public var quantizeEnabled: Bool?
+    public var loopEnabled: Bool?
     public var loopSize: String?
     public var filter: String?
     public var gain: String?
@@ -51,6 +52,7 @@ public struct DeckInfo: Equatable {
         lineVolume: String? = nil,
         keyLockEnabled: Bool? = nil,
         quantizeEnabled: Bool? = nil,
+        loopEnabled: Bool? = nil,
         loopSize: String? = nil,
         filter: String? = nil,
         gain: String? = nil,
@@ -70,6 +72,7 @@ public struct DeckInfo: Equatable {
         self.lineVolume = lineVolume
         self.keyLockEnabled = keyLockEnabled
         self.quantizeEnabled = quantizeEnabled
+        self.loopEnabled = loopEnabled
         self.loopSize = loopSize
         self.filter = filter
         self.gain = gain
