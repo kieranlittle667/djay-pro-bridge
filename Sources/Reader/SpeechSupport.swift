@@ -201,12 +201,16 @@ final class DeckAnnouncer {
     private var previousDecks: [Int: DeckInfo] = [:]
     private var seededDecks: Set<Int> = []
     private var pendingLoopSizeAnnouncement: Set<Int> = []
+    private var lastKnownLoopSizeByDeck: [Int: String] = [:]
 
     init(speaker: SpeechCoordinator) {
         self.speaker = speaker
     }
 
     func process(deckNumber: Int, deck: DeckInfo) {
+        if let loop = deck.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !loop.isEmpty {
+            lastKnownLoopSizeByDeck[deckNumber] = loop
+        }
         defer { previousDecks[deckNumber] = deck }
 
         guard isMeaningful(deck) else { return }
@@ -265,10 +269,11 @@ final class DeckAnnouncer {
 
         if previousEnabled != currentEnabled {
             if currentEnabled {
-                if let currentLoop, !currentLoop.isEmpty {
+                let loopToSpeak = currentLoop ?? previousLoop ?? lastKnownLoopSizeByDeck[deckNumber]
+                if let loopToSpeak, !loopToSpeak.isEmpty {
                     pendingLoopSizeAnnouncement.remove(deckNumber)
                     speaker.speak(
-                        "Deck \(deckNumber) loop \(currentLoop)",
+                        "Deck \(deckNumber) loop \(loopToSpeak)",
                         key: "deck\(deckNumber)-loop-enabled",
                         minInterval: 0.05,
                         coalesce: true,
