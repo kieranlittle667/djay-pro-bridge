@@ -384,13 +384,15 @@ final class DeckAnnouncer {
     private func announceNeuralMixButtonChanges(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
         let keys = Set(previous.neuralMixButtons.keys).union(current.neuralMixButtons.keys)
         for key in keys.sorted() {
+            guard shouldAnnounceNeuralMixButton(key) else { continue }
             guard let currentValue = current.neuralMixButtons[key],
                   let previousValue = previous.neuralMixButtons[key],
                   currentValue != previousValue else { continue }
-            guard let message = neuralMixButtonMessage(deckNumber: deckNumber, key: key, enabled: currentValue) else { continue }
+            guard let message = neuralMixButtonMessage(deckNumber: deckNumber, key: key, enabled: currentValue),
+                  let normalizedKey = normalizedNeuralMixButtonKey(key) else { continue }
             speaker.speak(
                 message,
-                key: "deck\(deckNumber)-neural-button-\(key)",
+                key: "deck\(deckNumber)-neural-button-\(normalizedKey)",
                 minInterval: 0.15,
                 coalesce: true,
                 settleDelay: 0.08
@@ -398,10 +400,19 @@ final class DeckAnnouncer {
         }
     }
 
+    private func shouldAnnounceNeuralMixButton(_ key: String) -> Bool {
+        key.hasPrefix("4ch-")
+    }
+
+    private func normalizedNeuralMixButtonKey(_ key: String) -> String? {
+        let parts = key.split(separator: "-")
+        guard parts.count >= 3 else { return nil }
+        return parts.dropFirst().joined(separator: "-")
+    }
+
     private func neuralMixButtonMessage(deckNumber: Int, key: String, enabled: Bool) -> String? {
         let parts = key.split(separator: "-")
         guard parts.count >= 3 else { return nil }
-        let channels = parts[0]
         let action = parts.suffix(1).first.map(String.init) ?? ""
         let stem = parts.dropFirst().dropLast().joined(separator: " ")
         let actionText = action == "solo" ? "solo" : action == "mute" ? "mute" : action
