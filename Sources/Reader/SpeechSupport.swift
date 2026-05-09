@@ -16,6 +16,7 @@ final class SpeechCoordinator: NSObject {
     private let rate: Float
     private let queue = DispatchQueue(label: "speech-coordinator")
     private var lastSpokenAtByKey: [String: Date] = [:]
+    private var latestRequestByKey: [String: UUID] = [:]
     private let logAnnouncements: Bool
     private let backend: SpeechBackend
     private let minimumGap: TimeInterval
@@ -35,10 +36,18 @@ final class SpeechCoordinator: NSObject {
         super.init()
     }
 
-    func speak(_ text: String, key: String, minInterval: TimeInterval = 0.75) {
+    func speak(_ text: String, key: String, minInterval: TimeInterval = 0.75, coalesce: Bool = false) {
+        let requestId = UUID()
         queue.async {
+            if coalesce {
+                self.latestRequestByKey[key] = requestId
+            }
+
             let now = Date()
             if let last = self.lastSpokenAtByKey[key], now.timeIntervalSince(last) < minInterval {
+                return
+            }
+            if coalesce, self.latestRequestByKey[key] != requestId {
                 return
             }
             self.lastSpokenAtByKey[key] = now
@@ -206,7 +215,7 @@ final class DeckAnnouncer {
         guard let loop = current.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !loop.isEmpty,
               let previousLoop = previous.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !previousLoop.isEmpty,
               loop != previousLoop else { return }
-        speaker.speak("Deck \(deckNumber) loop \(loop)", key: "deck\(deckNumber)-loop", minInterval: 0.5)
+        speaker.speak("Deck \(deckNumber) loop \(loop)", key: "deck\(deckNumber)-loop", minInterval: 0.2, coalesce: true)
     }
 
     private func announceFXChanges(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
@@ -218,14 +227,15 @@ final class DeckAnnouncer {
             if let name = new.parameterName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
                let oldName = old.parameterName?.trimmingCharacters(in: .whitespacesAndNewlines), !oldName.isEmpty,
                name != oldName {
-                speaker.speak("Deck \(deckNumber) FX \(slot) \(name)", key: "deck\(deckNumber)-fx\(slot)-name", minInterval: 0.5)
+                speaker.speak("Deck \(deckNumber) FX \(slot) \(name)", key: "deck\(deckNumber)-fx\(slot)-name", minInterval: 0.2, coalesce: true)
             }
 
             if let enabled = new.isEnabled, let oldEnabled = old.isEnabled, enabled != oldEnabled {
                 speaker.speak(
                     "Deck \(deckNumber) FX \(slot) \(enabled ? "on" : "off")",
                     key: "deck\(deckNumber)-fx\(slot)-enabled",
-                    minInterval: 0.35
+                    minInterval: 0.15,
+                    coalesce: true
                 )
             }
         }
