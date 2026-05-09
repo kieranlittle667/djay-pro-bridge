@@ -37,6 +37,7 @@ public struct DeckInfo: Equatable {
     public var neuralPercussiveEnabled: Bool?
     public var neuralAcapellaEnabled: Bool?
     public var neuralTonalEnabled: Bool?
+    public var neuralMixButtons: [String: Bool]
     public var filter: String?
     public var gain: String?
     public var eqHigh: String?
@@ -62,6 +63,7 @@ public struct DeckInfo: Equatable {
         neuralPercussiveEnabled: Bool? = nil,
         neuralAcapellaEnabled: Bool? = nil,
         neuralTonalEnabled: Bool? = nil,
+        neuralMixButtons: [String: Bool] = [:],
         filter: String? = nil,
         gain: String? = nil,
         eqHigh: String? = nil,
@@ -86,6 +88,7 @@ public struct DeckInfo: Equatable {
         self.neuralPercussiveEnabled = neuralPercussiveEnabled
         self.neuralAcapellaEnabled = neuralAcapellaEnabled
         self.neuralTonalEnabled = neuralTonalEnabled
+        self.neuralMixButtons = neuralMixButtons
         self.filter = filter
         self.gain = gain
         self.eqHigh = eqHigh

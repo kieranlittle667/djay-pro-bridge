@@ -235,6 +235,7 @@ final class DeckAnnouncer {
         announceKeyLockChange(deckNumber: deckNumber, previous: previous, current: deck)
         announceLoopChange(deckNumber: deckNumber, previous: previous, current: deck)
         announceNeuralMixChanges(deckNumber: deckNumber, previous: previous, current: deck)
+        announceNeuralMixButtonChanges(deckNumber: deckNumber, previous: previous, current: deck)
         announceFXChanges(deckNumber: deckNumber, previous: previous, current: deck)
     }
 
@@ -378,6 +379,33 @@ final class DeckAnnouncer {
             coalesce: true,
             settleDelay: 0.08
         )
+    }
+
+    private func announceNeuralMixButtonChanges(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
+        let keys = Set(previous.neuralMixButtons.keys).union(current.neuralMixButtons.keys)
+        for key in keys.sorted() {
+            guard let currentValue = current.neuralMixButtons[key],
+                  let previousValue = previous.neuralMixButtons[key],
+                  currentValue != previousValue else { continue }
+            guard let message = neuralMixButtonMessage(deckNumber: deckNumber, key: key, enabled: currentValue) else { continue }
+            speaker.speak(
+                message,
+                key: "deck\(deckNumber)-neural-button-\(key)",
+                minInterval: 0.15,
+                coalesce: true,
+                settleDelay: 0.08
+            )
+        }
+    }
+
+    private func neuralMixButtonMessage(deckNumber: Int, key: String, enabled: Bool) -> String? {
+        let parts = key.split(separator: "-")
+        guard parts.count >= 3 else { return nil }
+        let channels = parts[0]
+        let action = parts.suffix(1).first.map(String.init) ?? ""
+        let stem = parts.dropFirst().dropLast().joined(separator: " ")
+        let actionText = action == "solo" ? "solo" : action == "mute" ? "mute" : action
+        return "Deck \(deckNumber) \(stem) \(actionText) \(enabled ? "on" : "off")"
     }
 
     private func announceFXChanges(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {

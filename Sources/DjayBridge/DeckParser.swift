@@ -91,6 +91,24 @@ private func looksLikeLoopLength(_ value: String) -> Bool {
     return lower.contains("beat") || lower.contains("bar") || lower.contains("loop") || lower.range(of: #"^\d+(/\d+)?$"#, options: .regularExpression) != nil
 }
 
+private func neuralMixButtonKey(from property: String) -> String? {
+    guard let regex = try? NSRegularExpression(pattern: #"^Neural Mix (Solo|Mute) \((\d+)ch: ([^)]+)\)$"#, options: [.caseInsensitive]) else {
+        return nil
+    }
+    let nsrange = NSRange(property.startIndex..<property.endIndex, in: property)
+    guard let match = regex.firstMatch(in: property, options: [], range: nsrange), match.numberOfRanges >= 4,
+          let actionRange = Range(match.range(at: 1), in: property),
+          let channelsRange = Range(match.range(at: 2), in: property),
+          let stemRange = Range(match.range(at: 3), in: property) else { return nil }
+
+    let action = property[actionRange].lowercased()
+    let channels = property[channelsRange]
+    let stem = property[stemRange].lowercased()
+        .replacingOccurrences(of: "acappella", with: "acapella")
+        .replacingOccurrences(of: " ", with: "-")
+    return "\(channels)ch-\(stem)-\(action)"
+}
+
 private func setFXSlotValue(_ info: inout DeckInfo, slot: Int, update: (inout FXSlotInfo) -> Void) {
     var fxSlot = info.fxSlots[slot] ?? FXSlotInfo()
     update(&fxSlot)
@@ -121,6 +139,9 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
         else if lowerProp == "percussive" { info.neuralPercussiveEnabled = (valueString == "Active") }
         else if lowerProp == "acapella" { info.neuralAcapellaEnabled = (valueString == "Active") }
         else if lowerProp == "tonal" { info.neuralTonalEnabled = (valueString == "Active") }
+        else if let neuralButtonKey = neuralMixButtonKey(from: prop) {
+            info.neuralMixButtons[neuralButtonKey] = (valueString == "Active")
+        }
         else if lowerProp == "loop" {
             let trimmed = valueString.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed == "Active" {
