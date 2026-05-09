@@ -18,17 +18,20 @@ final class SpeechCoordinator: NSObject {
     private var lastSpokenAtByKey: [String: Date] = [:]
     private let logAnnouncements: Bool
     private let backend: SpeechBackend
+    private let minimumGap: TimeInterval
 
     init(
         preferredVoiceName: String? = nil,
         rate: Float = 0.42,
         logAnnouncements: Bool = true,
-        backend: SpeechBackend = .say
+        backend: SpeechBackend = .auto,
+        minimumGap: TimeInterval = 0.15
     ) {
         self.preferredVoiceName = preferredVoiceName
         self.rate = rate
         self.logAnnouncements = logAnnouncements
         self.backend = backend
+        self.minimumGap = minimumGap
         super.init()
     }
 
@@ -66,6 +69,11 @@ final class SpeechCoordinator: NSObject {
         }
     }
 
+    private func estimatedDuration(for text: String) -> TimeInterval {
+        let words = max(1, text.split(whereSeparator: \ .isWhitespace).count)
+        return max(0.6, Double(words) * 0.33 + minimumGap)
+    }
+
     private func isVoiceOverRunning() -> Bool {
         NSWorkspace.shared.runningApplications.contains {
             $0.bundleIdentifier == "com.apple.VoiceOver" ||
@@ -84,6 +92,7 @@ final class SpeechCoordinator: NSObject {
             notification: .announcementRequested,
             userInfo: userInfo
         )
+        Thread.sleep(forTimeInterval: estimatedDuration(for: text))
         return true
     }
 
@@ -99,7 +108,9 @@ final class SpeechCoordinator: NSObject {
         process.arguments = arguments
         do {
             try process.run()
-            return true
+            process.waitUntilExit()
+            Thread.sleep(forTimeInterval: minimumGap)
+            return process.terminationStatus == 0
         } catch {
             printError("⚠️ Failed to run say: \(error)")
             return false
@@ -111,6 +122,7 @@ final class SpeechCoordinator: NSObject {
         utterance.rate = rate
         utterance.voice = resolveVoice()
         synthesizer.speak(utterance)
+        Thread.sleep(forTimeInterval: estimatedDuration(for: text))
     }
 
     private func resolveVoice() -> AVSpeechSynthesisVoice? {

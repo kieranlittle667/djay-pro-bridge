@@ -7,7 +7,7 @@ var logMode = false
 var speakMode = false
 var renderIntervalMs: UInt32 = 33  // ~30fps default
 var preferredVoiceName: String? = nil
-var speechBackend = SpeechBackend.say
+var speechBackend = SpeechBackend.auto
 
 let args = CommandLine.arguments
 if let idx = args.firstIndex(of: "--interval"), idx + 1 < args.count,
