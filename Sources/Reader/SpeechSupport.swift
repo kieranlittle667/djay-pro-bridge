@@ -302,7 +302,7 @@ final class DeckAnnouncer {
             return
         }
 
-        guard currentEnabled, let currentLoop, !currentLoop.isEmpty else { return }
+        guard let currentLoop, !currentLoop.isEmpty else { return }
 
         if pendingLoopSizeAnnouncement.contains(deckNumber) {
             pendingLoopSizeAnnouncement.remove(deckNumber)
@@ -319,11 +319,11 @@ final class DeckAnnouncer {
         guard let previousLoop, !previousLoop.isEmpty, currentLoop != previousLoop else { return }
 
         speaker.speak(
-            "Deck \(deckNumber) loop \(currentLoop)",
-            key: "deck\(deckNumber)-loop-size",
+            currentEnabled ? "Deck \(deckNumber) loop \(currentLoop)" : "Deck \(deckNumber) loop size \(currentLoop)",
+            key: currentEnabled ? "deck\(deckNumber)-loop-size-active" : "deck\(deckNumber)-loop-size-selected",
             minInterval: 0.05,
             coalesce: true,
-            settleDelay: 0.22
+            settleDelay: currentEnabled ? 0.22 : 0.14
         )
     }
 
