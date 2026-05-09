@@ -68,7 +68,27 @@ Options:
 ```bash
 swift run Reader --interval 100  # render interval in ms (default 33, ~30fps)
 swift run Reader --log           # scrolling log output instead of TUI
+swift run Reader --speak         # speak detected deck changes
+swift run Reader --speak --voice Daniel  # use a specific system voice when VoiceOver is not running
 ```
+
+
+### Speech announcements
+
+The reader can now announce a first pass of detected changes with `--speak`.
+
+Behavior:
+- If VoiceOver is running, it posts announcements through the accessibility system.
+- If VoiceOver is not running, it falls back to macOS speech synthesis using the default system voice (or `--voice <Name>`).
+
+Currently announced in this branch:
+- track/title changes
+- play/pause
+- loop size changes
+- FX parameter name changes
+- FX enable on/off when djay exposes a readable AX state
+
+Caveat: some djay controls are still accessibility-tree-dependent and may not expose reliable state yet, especially action-only buttons.
 
 The reader uses two threads: a background thread polls djay Pro's accessibility tree continuously (estimated ~8fps, limited by the cost of the accessibility tree walk), while the main thread renders at the `--interval` rate. The higher render rate allows smooth interpolated deck timestamps, which is important for timecode output that can be added later.
 

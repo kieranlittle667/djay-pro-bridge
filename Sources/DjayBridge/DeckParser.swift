@@ -57,6 +57,24 @@ private func labelPrefix(_ label: String) -> String {
     return label
 }
 
+private func parseSlotNumber(from property: String) -> Int? {
+    let patterns = [#"\bfx\s*(\d+)\b"#, #"\bslot\s*(\d+)\b"#]
+    for pattern in patterns {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+        let nsrange = NSRange(property.startIndex..<property.endIndex, in: property)
+        guard let match = regex.firstMatch(in: property, options: [], range: nsrange), match.numberOfRanges > 1,
+              let range = Range(match.range(at: 1), in: property) else { continue }
+        return Int(property[range])
+    }
+    return nil
+}
+
+private func setFXSlotValue(_ info: inout DeckInfo, slot: Int, update: (inout FXSlotInfo) -> Void) {
+    var fxSlot = info.fxSlots[slot] ?? FXSlotInfo()
+    update(&fxSlot)
+    info.fxSlots[slot] = fxSlot
+}
+
 public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
     let prefix = "Deck \(deckNumber)"
     let allElements = findLabeledElements(app, prefix: prefix)
@@ -65,6 +83,7 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
     for (label, value) in allElements {
         let lower = label.lowercased()
         let prop = labelPrefix(label)
+        let lowerProp = prop.lowercased()
 
         if lower.starts(with: "key,") { info.key = value }
         else if lower.starts(with: "title,") { info.title = value }
@@ -72,6 +91,9 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
         else if lower.starts(with: "elapsed time,") { info.elapsedTime = value }
         else if lower.starts(with: "remaining time,") { info.remainingTime = value }
         else if lower.starts(with: "play /") { info.isPlaying = (value == "Active") }
+        else if lowerProp.starts(with: "key lock") { info.keyLockEnabled = (value == "Active") }
+        else if lowerProp.starts(with: "quantize") { info.quantizeEnabled = (value == "Active") }
+        else if lowerProp == "loop" { info.loopSize = value }
         // Value-as-label: BPM is a numeric label like "124.0, Deck 1"
         else if prop.range(of: #"^\d+\.\d+$"#, options: .regularExpression) != nil {
             info.bpm = prop
@@ -80,7 +102,24 @@ public func getDeckInfo(app: AXUIElement, deckNumber: Int) -> DeckInfo {
         else if prop.range(of: #"^[+-]?\d+\.\d+%$"#, options: .regularExpression) != nil {
             info.bpmPercent = prop
         }
-        else if lower.starts(with: "line volume,") { info.lineVolume = value }
+        else if lowerProp.starts(with: "line volume") { info.lineVolume = value }
+        else if lowerProp == "filter" { info.filter = value }
+        else if lowerProp == "gain" { info.gain = value }
+        else if lowerProp == "high" || lowerProp == "high eq" { info.eqHigh = value }
+        else if lowerProp == "mid" || lowerProp == "mid eq" { info.eqMid = value }
+        else if lowerProp == "low" || lowerProp == "low eq" { info.eqLow = value }
+        else if lowerProp.contains("fx") {
+            let slot = parseSlotNumber(from: lowerProp) ?? 1
+            if lowerProp.contains("parameter name") {
+                setFXSlotValue(&info, slot: slot) { $0.parameterName = value }
+            } else if lowerProp.contains("wet/dry") || lowerProp.contains("wet dry") {
+                setFXSlotValue(&info, slot: slot) { $0.wetDry = value }
+            } else if lowerProp.contains("enable") {
+                setFXSlotValue(&info, slot: slot) { $0.isEnabled = (value == "Active") }
+            } else if lowerProp.contains("parameter") {
+                setFXSlotValue(&info, slot: slot) { $0.parameterValue = value }
+            }
+        }
     }
     return info
 }
