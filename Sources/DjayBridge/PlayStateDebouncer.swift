@@ -6,12 +6,12 @@ public struct PlayStateDebouncer {
     private var lastRawChangeTime: Date = .distantPast
     private let threshold: TimeInterval
 
-    public init(threshold: TimeInterval = 0.7) {
+    public init(threshold: TimeInterval = 1.2) {
         self.threshold = threshold
     }
 
     /// Returns the debounced play state.
-    /// Paused-to-playing requires `threshold` seconds of sustained `true`.
+    /// Paused-to-playing requires `threshold` seconds of sustained `true` to avoid cue-preview false positives.
     /// Playing-to-paused is immediate.
     public mutating func update(isPlaying: Bool) -> Bool {
         if isPlaying != rawState {
