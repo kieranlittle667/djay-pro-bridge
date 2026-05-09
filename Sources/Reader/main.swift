@@ -101,8 +101,6 @@ let announcer = speakMode ? DeckAnnouncer(speaker: SpeechCoordinator(preferredVo
 
 let pollQueue = DispatchQueue(label: "ax-poll", qos: .userInitiated)
 pollQueue.async {
-    var didSeedAnnouncements = false
-
     while true {
         let deck1 = getDeckInfo(app: djay.element, deckNumber: 1)
         let deck2 = getDeckInfo(app: djay.element, deckNumber: 2)
@@ -112,10 +110,6 @@ pollQueue.async {
         if let announcer {
             announcer.process(deckNumber: 1, deck: deck1)
             announcer.process(deckNumber: 2, deck: deck2)
-            if !didSeedAnnouncements {
-                announcer.seedCompleted()
-                didSeedAnnouncements = true
-            }
         }
         // No sleep — poll as fast as AX allows (~8fps)
     }

@@ -146,7 +146,7 @@ final class SpeechCoordinator: NSObject {
 final class DeckAnnouncer {
     private let speaker: SpeechCoordinator
     private var previousDecks: [Int: DeckInfo] = [:]
-    private var hasSeeded = false
+    private var seededDecks: Set<Int> = []
 
     init(speaker: SpeechCoordinator) {
         self.speaker = speaker
@@ -155,8 +155,16 @@ final class DeckAnnouncer {
     func process(deckNumber: Int, deck: DeckInfo) {
         defer { previousDecks[deckNumber] = deck }
 
-        guard hasSeeded else { return }
+        guard isMeaningful(deck) else { return }
+
+        guard seededDecks.contains(deckNumber) else {
+            seededDecks.insert(deckNumber)
+            return
+        }
+
         let previous = previousDecks[deckNumber] ?? DeckInfo()
+        guard isMeaningful(previous) else { return }
+        guard !looksLikeBulkRefresh(previous: previous, current: deck) else { return }
 
         announceTrackChange(deckNumber: deckNumber, previous: previous, current: deck)
         announcePlayState(deckNumber: deckNumber, previous: previous, current: deck)
@@ -164,13 +172,24 @@ final class DeckAnnouncer {
         announceFXChanges(deckNumber: deckNumber, previous: previous, current: deck)
     }
 
-    func seedCompleted() {
-        hasSeeded = true
+    private func isMeaningful(_ deck: DeckInfo) -> Bool {
+        deck.title?.isEmpty == false || deck.artist?.isEmpty == false || deck.bpm?.isEmpty == false || !deck.fxSlots.isEmpty || deck.loopSize?.isEmpty == false
+    }
+
+    private func looksLikeBulkRefresh(previous: DeckInfo, current: DeckInfo) -> Bool {
+        var changes = 0
+        if previous.title != current.title { changes += 1 }
+        if previous.artist != current.artist { changes += 1 }
+        if previous.loopSize != current.loopSize { changes += 1 }
+        if previous.isPlaying != current.isPlaying { changes += 1 }
+        if previous.fxSlots != current.fxSlots { changes += 1 }
+        return changes >= 3
     }
 
     private func announceTrackChange(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
         guard let title = current.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty,
-              title != previous.title else { return }
+              let previousTitle = previous.title?.trimmingCharacters(in: .whitespacesAndNewlines), !previousTitle.isEmpty,
+              title != previousTitle else { return }
         let trimmedArtist = current.artist?.trimmingCharacters(in: .whitespacesAndNewlines)
         let artistPart = (trimmedArtist?.isEmpty == false) ? trimmedArtist : nil
         let message = artistPart.map { "Deck \(deckNumber) loaded \(title) by \($0)" } ?? "Deck \(deckNumber) loaded \(title)"
@@ -185,7 +204,8 @@ final class DeckAnnouncer {
 
     private func announceLoopChange(deckNumber: Int, previous: DeckInfo, current: DeckInfo) {
         guard let loop = current.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !loop.isEmpty,
-              loop != previous.loopSize else { return }
+              let previousLoop = previous.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines), !previousLoop.isEmpty,
+              loop != previousLoop else { return }
         speaker.speak("Deck \(deckNumber) loop \(loop)", key: "deck\(deckNumber)-loop", minInterval: 0.5)
     }
 
@@ -196,11 +216,12 @@ final class DeckAnnouncer {
             let new = current.fxSlots[slot] ?? FXSlotInfo()
 
             if let name = new.parameterName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
-               name != old.parameterName {
+               let oldName = old.parameterName?.trimmingCharacters(in: .whitespacesAndNewlines), !oldName.isEmpty,
+               name != oldName {
                 speaker.speak("Deck \(deckNumber) FX \(slot) \(name)", key: "deck\(deckNumber)-fx\(slot)-name", minInterval: 0.5)
             }
 
-            if let enabled = new.isEnabled, enabled != old.isEnabled {
+            if let enabled = new.isEnabled, let oldEnabled = old.isEnabled, enabled != oldEnabled {
                 speaker.speak(
                     "Deck \(deckNumber) FX \(slot) \(enabled ? "on" : "off")",
                     key: "deck\(deckNumber)-fx\(slot)-enabled",
