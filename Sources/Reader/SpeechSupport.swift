@@ -18,6 +18,7 @@ final class SpeechCoordinator: NSObject {
     private let schedulerQueue = DispatchQueue(label: "speech-scheduler")
     private var lastSpokenAtByKey: [String: Date] = [:]
     private var pendingWorkByKey: [String: DispatchWorkItem] = [:]
+    private var generationByKey: [String: Int] = [:]
     private let logAnnouncements: Bool
     private let backend: SpeechBackend
     private let minimumGap: TimeInterval
