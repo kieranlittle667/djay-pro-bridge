@@ -47,21 +47,47 @@ final class SpeechCoordinator: NSObject {
     ) {
         if coalesce || settleDelay > 0 {
             schedulerQueue.async {
-                if self.pendingWorkByKey[key] != nil { Logger.shared.log("COALESCE replace key=\(key) text=\(text)") }
-                self.pendingWorkByKey[key]?.cancel()
-                let work = DispatchWorkItem { [weak self] in
-                    self?.enqueueSpeech(text, key: key, minInterval: minInterval)
+                if self.pendingWorkByKey[key] != nil {
+                    Logger.shared.log("COALESCE replace key=\(key) text=\(text)")
                 }
+                self.pendingWorkByKey[key]?.cancel()
+
+                let generation = (self.generationByKey[key] ?? 0) + 1
+                self.generationByKey[key] = generation
+
+                var work: DispatchWorkItem?
+                work = DispatchWorkItem { [weak self] in
+                    guard let self else { return }
+                    guard let work else { return }
+
+                    if work.isCancelled {
+                        Logger.shared.log("DROP cancelled key=\(key) text=\(text)")
+                        return
+                    }
+                    guard self.generationByKey[key] == generation else {
+                        Logger.shared.log("DROP stale_generation key=\(key) text=\(text)")
+                        return
+                    }
+
+                    self.pendingWorkByKey[key] = nil
+                    self.enqueueSpeech(text, key: key, minInterval: minInterval, generation: generation)
+                }
+
                 self.pendingWorkByKey[key] = work
-                self.schedulerQueue.asyncAfter(deadline: .now() + max(settleDelay, minInterval), execute: work)
+                self.schedulerQueue.asyncAfter(deadline: .now() + max(settleDelay, minInterval), execute: work!)
             }
         } else {
-            enqueueSpeech(text, key: key, minInterval: minInterval)
+            enqueueSpeech(text, key: key, minInterval: minInterval, generation: nil)
         }
     }
 
-    private func enqueueSpeech(_ text: String, key: String, minInterval: TimeInterval) {
+    private func enqueueSpeech(_ text: String, key: String, minInterval: TimeInterval, generation: Int?) {
         speechQueue.async {
+            if let generation, self.generationByKey[key] != generation {
+                Logger.shared.log("DROP stale_before_speak key=\(key) text=\(text)")
+                return
+            }
+
             let now = Date()
             if let last = self.lastSpokenAtByKey[key], now.timeIntervalSince(last) < minInterval {
                 Logger.shared.log("DROP rate_limit key=\(key) text=\(text)")
@@ -98,7 +124,7 @@ final class SpeechCoordinator: NSObject {
 
     private func estimatedDuration(for text: String) -> TimeInterval {
         let words = max(1, text.split(whereSeparator: { $0.isWhitespace }).count)
-        return max(0.6, Double(words) * 0.33 + minimumGap)
+        return max(0.45, Double(words) * 0.22 + minimumGap)
     }
 
     private func escapeAppleScript(_ text: String) -> String {
@@ -236,9 +262,9 @@ final class DeckAnnouncer {
         speaker.speak(
             "Deck \(deckNumber) loop \(loop)",
             key: "deck\(deckNumber)-loop",
-            minInterval: 0.1,
+            minInterval: 0.05,
             coalesce: true,
-            settleDelay: 0.45
+            settleDelay: 0.35
         )
     }
 
@@ -256,7 +282,7 @@ final class DeckAnnouncer {
                     key: "deck\(deckNumber)-fx\(slot)-name",
                     minInterval: 0.1,
                     coalesce: true,
-                    settleDelay: 0.25
+                    settleDelay: 0.2
                 )
             }
 
@@ -266,7 +292,7 @@ final class DeckAnnouncer {
                     key: "deck\(deckNumber)-fx\(slot)-enabled",
                     minInterval: 0.1,
                     coalesce: true,
-                    settleDelay: 0.12
+                    settleDelay: 0.1
                 )
             }
         }
