@@ -112,11 +112,12 @@ pollQueue.async {
         let deck2 = getDeckInfo(app: djay.element, deckNumber: 2)
         let crossfader = getCrossfader(app: djay.element)
         state.updateFromAX(deck1: deck1, deck2: deck2, crossfader: crossfader)
-        Logger.shared.log("STATE d1_title=\(deck1.title ?? "-") d1_loop_on=\(deck1.loopEnabled.map(String.init) ?? "nil") d1_loop=\(deck1.loopSize ?? "-") d1_play=\(deck1.isPlaying) d2_title=\(deck2.title ?? "-") d2_loop_on=\(deck2.loopEnabled.map(String.init) ?? "nil") d2_loop=\(deck2.loopSize ?? "-") d2_play=\(deck2.isPlaying) cf=\(crossfader ?? "-")")
+        let (debouncedDeck1, debouncedDeck2, _, _, _, _, _, _) = state.snapshot()
+        Logger.shared.log("STATE raw_d1_play=\(deck1.isPlaying) raw_d2_play=\(deck2.isPlaying) d1_title=\(debouncedDeck1.title ?? "-") d1_loop_on=\(debouncedDeck1.loopEnabled.map(String.init) ?? "nil") d1_loop=\(debouncedDeck1.loopSize ?? "-") d1_play=\(debouncedDeck1.isPlaying) d2_title=\(debouncedDeck2.title ?? "-") d2_loop_on=\(debouncedDeck2.loopEnabled.map(String.init) ?? "nil") d2_loop=\(debouncedDeck2.loopSize ?? "-") d2_play=\(debouncedDeck2.isPlaying) cf=\(crossfader ?? "-")")
 
         if let announcer {
-            announcer.process(deckNumber: 1, deck: deck1)
-            announcer.process(deckNumber: 2, deck: deck2)
+            announcer.process(deckNumber: 1, deck: debouncedDeck1)
+            announcer.process(deckNumber: 2, deck: debouncedDeck2)
         }
         // No sleep — poll as fast as AX allows (~8fps)
     }
