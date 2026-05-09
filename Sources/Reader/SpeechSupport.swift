@@ -200,6 +200,7 @@ final class DeckAnnouncer {
     private let speaker: SpeechCoordinator
     private var previousDecks: [Int: DeckInfo] = [:]
     private var seededDecks: Set<Int> = []
+    private var pendingLoopSizeAnnouncement: Set<Int> = []
 
     init(speaker: SpeechCoordinator) {
         self.speaker = speaker
@@ -263,37 +264,61 @@ final class DeckAnnouncer {
         let currentLoop = current.loopSize?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if previousEnabled != currentEnabled {
-            let text: String
             if currentEnabled {
                 if let currentLoop, !currentLoop.isEmpty {
-                    text = "Deck \(deckNumber) loop \(currentLoop)"
+                    pendingLoopSizeAnnouncement.remove(deckNumber)
+                    speaker.speak(
+                        "Deck \(deckNumber) loop \(currentLoop)",
+                        key: "deck\(deckNumber)-loop-enabled",
+                        minInterval: 0.05,
+                        coalesce: true,
+                        settleDelay: 0.15
+                    )
                 } else {
-                    text = "Deck \(deckNumber) loop on"
+                    pendingLoopSizeAnnouncement.insert(deckNumber)
+                    speaker.speak(
+                        "Deck \(deckNumber) loop on",
+                        key: "deck\(deckNumber)-loop-enabled",
+                        minInterval: 0.05,
+                        coalesce: true,
+                        settleDelay: 0.12
+                    )
                 }
             } else {
-                text = "Deck \(deckNumber) loop off"
+                pendingLoopSizeAnnouncement.remove(deckNumber)
+                speaker.speak(
+                    "Deck \(deckNumber) loop off",
+                    key: "deck\(deckNumber)-loop-enabled",
+                    minInterval: 0.05,
+                    coalesce: true,
+                    settleDelay: 0.18
+                )
             }
+            return
+        }
+
+        guard currentEnabled, let currentLoop, !currentLoop.isEmpty else { return }
+
+        if pendingLoopSizeAnnouncement.contains(deckNumber) {
+            pendingLoopSizeAnnouncement.remove(deckNumber)
             speaker.speak(
-                text,
-                key: "deck\(deckNumber)-loop-enabled",
+                "Deck \(deckNumber) loop \(currentLoop)",
+                key: "deck\(deckNumber)-loop-size",
                 minInterval: 0.05,
                 coalesce: true,
-                settleDelay: 0.2
+                settleDelay: 0.12
             )
             return
         }
 
-        guard currentEnabled,
-              let currentLoop, !currentLoop.isEmpty,
-              let previousLoop, !previousLoop.isEmpty,
-              currentLoop != previousLoop else { return }
+        guard let previousLoop, !previousLoop.isEmpty, currentLoop != previousLoop else { return }
 
         speaker.speak(
             "Deck \(deckNumber) loop \(currentLoop)",
             key: "deck\(deckNumber)-loop-size",
             minInterval: 0.05,
             coalesce: true,
-            settleDelay: 0.3
+            settleDelay: 0.22
         )
     }
 
